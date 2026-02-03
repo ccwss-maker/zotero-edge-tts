@@ -6,6 +6,11 @@ let edgeTtsInstalled = true;
 let edgeTtsPath = "";
 let edgePlaybackPath = "";
 
+// 检测操作系统
+function isWindows(): boolean {
+  return Zotero.isWin;
+}
+
 // 获取偏好设置
 function getPref(key: string): any {
   return Zotero.Prefs.get(`${config.prefsPrefix}.${key}`, true);
@@ -39,23 +44,38 @@ function getUILang(): string {
 
 // 查找命令路径
 function findCommandPath(command: string): string {
-  const possiblePaths = [
-    `/usr/local/bin/${command}`,
-    `/usr/bin/${command}`,
-    `${Zotero.Profile.dir}/../.local/bin/${command}`,
-    // 从 HOME 环境变量构建路径
-  ];
+  const possiblePaths: string[] = [];
+  const env = Components.classes["@mozilla.org/process/environment;1"]
+    .getService(Components.interfaces.nsIEnvironment);
 
-  // 尝试从环境变量获取 HOME
-  try {
-    const env = Components.classes["@mozilla.org/process/environment;1"]
-      .getService(Components.interfaces.nsIEnvironment);
+  if (isWindows()) {
+    // Windows 路径
+    const winCommand = `${command}.exe`;
+    const userProfile = env.get("USERPROFILE");
+    const localAppData = env.get("LOCALAPPDATA");
+
+    if (userProfile) {
+      possiblePaths.push(`${userProfile}\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\${winCommand}`);
+      possiblePaths.push(`${userProfile}\\AppData\\Local\\Programs\\Python\\Python310\\Scripts\\${winCommand}`);
+      possiblePaths.push(`${userProfile}\\AppData\\Local\\Programs\\Python\\Python39\\Scripts\\${winCommand}`);
+      possiblePaths.push(`${userProfile}\\.local\\bin\\${winCommand}`);
+    }
+    if (localAppData) {
+      possiblePaths.push(`${localAppData}\\Programs\\Python\\Python311\\Scripts\\${winCommand}`);
+      possiblePaths.push(`${localAppData}\\Programs\\Python\\Python310\\Scripts\\${winCommand}`);
+    }
+    possiblePaths.push(`C:\\Python311\\Scripts\\${winCommand}`);
+    possiblePaths.push(`C:\\Python310\\Scripts\\${winCommand}`);
+  } else {
+    // Linux/macOS 路径
+    possiblePaths.push(`/usr/local/bin/${command}`);
+    possiblePaths.push(`/usr/bin/${command}`);
+    possiblePaths.push(`${Zotero.Profile.dir}/../.local/bin/${command}`);
+
     const home = env.get("HOME");
     if (home) {
       possiblePaths.unshift(`${home}/.local/bin/${command}`);
     }
-  } catch (e) {
-    // ignore
   }
 
   for (const path of possiblePaths) {
@@ -70,7 +90,7 @@ function findCommandPath(command: string): string {
       // continue
     }
   }
-  return command; // 返回命令名，依赖 PATH
+  return isWindows() ? `${command}.exe` : command;
 }
 
 // 检测 edge-tts 并获取可用语音
@@ -103,14 +123,21 @@ async function detectVoices(): Promise<void> {
         .get("TmpD", Components.interfaces.nsIFile);
       tempFile.append("edge-tts-voices.txt");
 
-      const bashFile = Components.classes["@mozilla.org/file/local;1"]
+      const shellFile = Components.classes["@mozilla.org/file/local;1"]
         .createInstance(Components.interfaces.nsIFile);
-      bashFile.initWithPath("/bin/bash");
 
       const proc = Components.classes["@mozilla.org/process/util;1"]
         .createInstance(Components.interfaces.nsIProcess);
-      proc.init(bashFile);
-      proc.run(true, ["-c", `${edgeTtsPath} --list-voices > ${tempFile.path} 2>&1`], 2);
+
+      if (isWindows()) {
+        shellFile.initWithPath("C:\\Windows\\System32\\cmd.exe");
+        proc.init(shellFile);
+        proc.run(true, ["/c", `"${edgeTtsPath}" --list-voices > "${tempFile.path}" 2>&1`], 2);
+      } else {
+        shellFile.initWithPath("/bin/bash");
+        proc.init(shellFile);
+        proc.run(true, ["-c", `${edgeTtsPath} --list-voices > ${tempFile.path} 2>&1`], 2);
+      }
 
       // 读取结果
       if (tempFile.exists()) {
@@ -321,14 +348,21 @@ function updateAllToggleButtons() {
 // 停止当前播放
 function stopSpeak() {
   try {
-    const pkillFile = Components.classes["@mozilla.org/file/local;1"]
+    const killFile = Components.classes["@mozilla.org/file/local;1"]
       .createInstance(Components.interfaces.nsIFile);
-    pkillFile.initWithPath("/usr/bin/pkill");
 
     const proc = Components.classes["@mozilla.org/process/util;1"]
       .createInstance(Components.interfaces.nsIProcess);
-    proc.init(pkillFile);
-    proc.run(true, ["-9", "mpv"], 2);
+
+    if (isWindows()) {
+      killFile.initWithPath("C:\\Windows\\System32\\taskkill.exe");
+      proc.init(killFile);
+      proc.run(true, ["/F", "/IM", "mpv.exe"], 3);
+    } else {
+      killFile.initWithPath("/usr/bin/pkill");
+      proc.init(killFile);
+      proc.run(true, ["-9", "mpv"], 2);
+    }
   } catch (e) {
     Zotero.debug(`EdgeTTS: stopSpeak error: ${e}`);
   }
