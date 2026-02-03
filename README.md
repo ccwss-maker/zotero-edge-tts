@@ -22,7 +22,7 @@ pip install edge-tts
 
 ## Installation
 
-1. Download the `.xpi` file from [Releases](https://github.com/ccwss/zotero-edge-tts/releases)
+1. Download the `.xpi` file from [Releases](https://github.com/ccwss-maker/zotero-edge-tts/releases)
 2. In Zotero, go to `Tools` → `Add-ons`
 3. Click the gear icon → `Install Add-on From File...`
 4. Select the downloaded `.xpi` file
