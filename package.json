@@ -1,0 +1,31 @@
+{
+  "name": "zotero-edge-tts",
+  "version": "1.0.0",
+  "description": "Read selected text with edge-playback",
+  "config": {
+    "addonName": "EdgeTTS",
+    "addonID": "edge-tts@zotero",
+    "addonRef": "edgetts",
+    "addonInstance": "EdgeTTS",
+    "prefsPrefix": "extensions.zotero.edgetts"
+  },
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "zotero-plugin build"
+  },
+  "author": "ccwss",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ccwss/zotero-edge-tts.git"
+  },
+  "dependencies": {
+    "zotero-plugin-toolkit": "^5.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.8",
+    "typescript": "^5.8.2",
+    "zotero-plugin-scaffold": "^0.7.2",
+    "zotero-types": "^4.0.5"
+  }
+}

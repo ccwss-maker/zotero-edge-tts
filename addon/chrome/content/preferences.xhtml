@@ -1,0 +1,38 @@
+<vbox id="zotero-prefpane-__addonRef__"
+      onload="Zotero.__addonInstance__.hooks.onPrefsLoad(window.document)"
+      xmlns:html="http://www.w3.org/1999/xhtml"
+>
+<vbox class="main-section" id="__addonRef__-settings">
+
+    <!-- Status Message -->
+    <html:p id="__addonRef__-status" style="margin: 10px 0; padding: 8px; border-radius: 4px;"></html:p>
+
+    <!-- Voice Selection -->
+    <vbox style="margin-bottom: 15px;">
+        <html:label id="__addonRef__-voice-label"
+                    for="__addonRef__-voice"
+                    style="font-weight: bold; margin-bottom: 5px;">
+        </html:label>
+        <menulist id="__addonRef__-voice" preference="__prefsPrefix__.voice">
+            <menupopup id="__addonRef__-voice-popup">
+            </menupopup>
+        </menulist>
+    </vbox>
+
+    <!-- Test Button -->
+    <hbox style="margin-top: 10px;">
+        <html:button
+                id="__addonRef__-test-btn"
+                onclick="Zotero.__addonInstance__.hooks.onTestSpeak()"
+                style="display: flex; align-items: center; gap: 6px; padding: 4px 12px; cursor: pointer; font-size: 12px;">
+            <html:span style="display: flex;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+            </html:span>
+            <html:span id="__addonRef__-test-label"></html:span>
+        </html:button>
+    </hbox>
+
+</vbox>
+</vbox>
