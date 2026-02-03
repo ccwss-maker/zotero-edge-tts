@@ -46,6 +46,8 @@ npm install
 npm run build
 ```
 
+After building, `zotero-edge-tts.xpi` will be generated in the `build/` folder. You can then import it into Zotero.
+
 ## License
 
 MIT
