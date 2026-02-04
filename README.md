@@ -75,9 +75,9 @@ curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
 # Reload shell configuration
 source ~/.bashrc  # or source ~/.zshrc for zsh
 
-# Install Node.js 22 (or any version >20)
-nvm install 22
-nvm use 22
+# Install Node.js 20
+nvm install 20
+nvm use 20
 
 # Verify installation (must be >20)
 node -v  # Should show v22.x.x or higher
