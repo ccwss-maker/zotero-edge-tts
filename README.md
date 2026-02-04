@@ -11,13 +11,13 @@ A Zotero plugin that reads selected text aloud using Microsoft Edge TTS.
 
 ## Requirements
 
-- **Zotero 7+ / 8+** (Tested on Zotero 8.0.2)
+- **Zotero 7+ / 8+**
 - **Linux** (currently)
 - **Node.js >20** (Required for building)
 - **[edge-tts](https://github.com/rany2/edge-tts)** - Text-to-speech engine
 - **[mpv](https://mpv.io/)** - Audio player
 
-> ✅ **Tested on Ubuntu 22.04 with Zotero 8.0.2 (64-bit)**
+> ✅ **Tested on Ubuntu 22.04 with Zotero 7.0.27 (64-bit) and Zotero 8.0.2 (64-bit)**
 
 ### Install Dependencies
 
