@@ -11,6 +11,18 @@ function getPref(key: string): any {
   return Zotero.Prefs.get(`${config.prefsPrefix}.${key}`, true);
 }
 
+// 获取调试模式状态
+function getDebugEnabled(): boolean {
+  return getPref("debugMode") === true;
+}
+
+// 条件调试输出 - 只在调试模式开启时输出
+function debugLog(message: string): void {
+  if (getDebugEnabled()) {
+    Zotero.debug(message);
+  }
+}
+
 // 设置偏好
 function setPref(key: string, value: any): void {
   Zotero.Prefs.set(`${config.prefsPrefix}.${key}`, value, true);
@@ -77,8 +89,13 @@ function findCommandPath(command: string): string {
 async function detectVoices(): Promise<void> {
   return new Promise((resolve) => {
     try {
+      debugLog("=== EdgeTTS: detectVoices Start ===");
+
       edgeTtsPath = findCommandPath("edge-tts");
       edgePlaybackPath = findCommandPath("edge-playback");
+
+      debugLog(`EdgeTTS: edgeTtsPath = ${edgeTtsPath}`);
+      debugLog(`EdgeTTS: edgePlaybackPath = ${edgePlaybackPath}`);
 
       const file = Components.classes["@mozilla.org/file/local;1"]
         .createInstance(Components.interfaces.nsIFile);
@@ -86,12 +103,15 @@ async function detectVoices(): Promise<void> {
       try {
         file.initWithPath(edgeTtsPath);
         if (!file.exists()) {
+          debugLog(`EdgeTTS: edge-tts not found at ${edgeTtsPath}`);
           edgeTtsInstalled = false;
           resolve();
           return;
         }
+        debugLog(`EdgeTTS: edge-tts found at ${edgeTtsPath}`);
       } catch (e) {
         // 路径可能不是绝对路径，假设已安装
+        debugLog(`EdgeTTS: Could not verify path, assuming edge-tts is installed: ${e}`);
         edgeTtsInstalled = true;
       }
 
@@ -103,6 +123,8 @@ async function detectVoices(): Promise<void> {
         .get("TmpD", Components.interfaces.nsIFile);
       tempFile.append("edge-tts-voices.txt");
 
+      debugLog(`EdgeTTS: Temp file path: ${tempFile.path}`);
+
       const bashFile = Components.classes["@mozilla.org/file/local;1"]
         .createInstance(Components.interfaces.nsIFile);
       bashFile.initWithPath("/bin/bash");
@@ -110,11 +132,18 @@ async function detectVoices(): Promise<void> {
       const proc = Components.classes["@mozilla.org/process/util;1"]
         .createInstance(Components.interfaces.nsIProcess);
       proc.init(bashFile);
-      proc.run(true, ["-c", `${edgeTtsPath} --list-voices > ${tempFile.path} 2>&1`], 2);
+
+      const listVoicesCmd = `${edgeTtsPath} --list-voices > ${tempFile.path} 2>&1`;
+      debugLog(`EdgeTTS: Running command: ${listVoicesCmd}`);
+
+      proc.run(true, ["-c", listVoicesCmd], 2);
 
       // 读取结果
       if (tempFile.exists()) {
         const data = Zotero.File.getContents(tempFile);
+        debugLog(`EdgeTTS: Voice list data length: ${data.length}`);
+        debugLog(`EdgeTTS: Voice list first 500 chars: ${data.substring(0, 500)}`);
+
         const lines = data.split("\n");
         availableVoices = [];
         for (const line of lines) {
@@ -123,12 +152,20 @@ async function detectVoices(): Promise<void> {
             availableVoices.push(match[1]);
           }
         }
+
+        debugLog(`EdgeTTS: Total voices found: ${availableVoices.length}`);
+        debugLog(`EdgeTTS: Chinese voices: ${availableVoices.filter(v => v.startsWith("zh-")).join(", ")}`);
+
         tempFile.remove(false);
+      } else {
+        debugLog(`EdgeTTS: Temp file does not exist after running command`);
       }
 
+      debugLog("=== EdgeTTS: detectVoices End ===");
       resolve();
     } catch (e) {
-      Zotero.debug(`EdgeTTS: detectVoices error: ${e}`);
+      debugLog(`EdgeTTS: detectVoices error: ${e}`);
+      debugLog(`EdgeTTS: Error stack: ${(e as Error).stack || 'No stack trace'}`);
       edgeTtsInstalled = true;
       resolve();
     }
@@ -277,10 +314,17 @@ function registerReaderListener() {
     "renderTextSelectionPopup",
     (event) => {
       const { reader } = event;
+      debugLog(`EdgeTTS: Text selection event triggered`);
+      debugLog(`EdgeTTS: AutoPlay enabled = ${getAutoPlay()}`);
+
       if (getAutoPlay()) {
         const text = ztoolkit.Reader.getSelectedText(reader);
+        debugLog(`EdgeTTS: Selected text length = ${text ? text.length : 0}`);
         if (text) {
+          debugLog(`EdgeTTS: Selected text preview: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`);
           speak(text);
+        } else {
+          debugLog(`EdgeTTS: No text selected`);
         }
       }
     },
@@ -304,7 +348,7 @@ function reloadReaderTabs() {
       }
     }
   } catch (e) {
-    Zotero.debug(`EdgeTTS: reloadReaderTabs error: ${e}`);
+    debugLog(`EdgeTTS: reloadReaderTabs error: ${e}`);
   }
 }
 
@@ -321,6 +365,8 @@ function updateAllToggleButtons() {
 // 停止当前播放
 function stopSpeak() {
   try {
+    debugLog(`EdgeTTS: stopSpeak() - Killing mpv processes`);
+
     const pkillFile = Components.classes["@mozilla.org/file/local;1"]
       .createInstance(Components.interfaces.nsIFile);
     pkillFile.initWithPath("/usr/bin/pkill");
@@ -329,31 +375,121 @@ function stopSpeak() {
       .createInstance(Components.interfaces.nsIProcess);
     proc.init(pkillFile);
     proc.run(true, ["-9", "mpv"], 2);
+
+    debugLog(`EdgeTTS: stopSpeak() - mpv processes killed`);
   } catch (e) {
-    Zotero.debug(`EdgeTTS: stopSpeak error: ${e}`);
+    debugLog(`EdgeTTS: stopSpeak error: ${e}`);
   }
 }
 
+// 清理文本中的无效Unicode字符
+function cleanText(text: string): string {
+  // 移除代理字符对（surrogate pairs）和其他无效字符
+  return text.replace(/[\uD800-\uDFFF]/g, '')
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ')  // 替换控制字符为空格
+    .trim();
+}
+
 function speak(text: string) {
-  if (!edgePlaybackPath) return;
+  debugLog("=== EdgeTTS Debug Start ===");
+  debugLog(`EdgeTTS: speak() called`);
+  debugLog(`EdgeTTS: edgePlaybackPath = ${edgePlaybackPath}`);
+
+  if (!edgePlaybackPath) {
+    debugLog("EdgeTTS: ERROR - edgePlaybackPath is empty!");
+    return;
+  }
+
+  // 清理文本
+  const cleanedText = cleanText(text);
+  debugLog(`EdgeTTS: Original text length = ${text.length}`);
+  debugLog(`EdgeTTS: Cleaned text length = ${cleanedText.length}`);
+
+  if (!cleanedText) {
+    debugLog("EdgeTTS: ERROR - Text is empty after cleaning!");
+    return;
+  }
 
   // 终止上一条播放
   stopSpeak();
 
   const voice = getVoice();
 
+  debugLog(`EdgeTTS: Selected voice = ${voice}`);
+  debugLog(`EdgeTTS: Text to speak (length=${cleanedText.length}): ${cleanedText.substring(0, 100)}${cleanedText.length > 100 ? '...' : ''}`);
+  debugLog(`EdgeTTS: Text encoding check - first char code: ${cleanedText.charCodeAt(0)}`);
+
   try {
-    const file = Components.classes["@mozilla.org/file/local;1"]
+    // 将文本写入临时文件，避免命令行编码问题
+    const tempDir = Components.classes["@mozilla.org/file/directory_service;1"]
+      .getService(Components.interfaces.nsIProperties)
+      .get("TmpD", Components.interfaces.nsIFile);
+
+    const textFile = tempDir.clone();
+    textFile.append("edge-tts-text.txt");
+    const stdoutFile = tempDir.clone();
+    stdoutFile.append("edge-tts-stdout.txt");
+    const stderrFile = tempDir.clone();
+    stderrFile.append("edge-tts-stderr.txt");
+
+    // 写入文本到文件（UTF-8编码）
+    Zotero.File.putContents(textFile, cleanedText);
+    debugLog(`EdgeTTS: Text file: ${textFile.path}`);
+    debugLog(`EdgeTTS: stdout file: ${stdoutFile.path}`);
+    debugLog(`EdgeTTS: stderr file: ${stderrFile.path}`);
+
+    // 使用bash来运行命令并捕获输出
+    const bashFile = Components.classes["@mozilla.org/file/local;1"]
       .createInstance(Components.interfaces.nsIFile);
-    file.initWithPath(edgePlaybackPath);
+    bashFile.initWithPath("/bin/bash");
 
     const proc = Components.classes["@mozilla.org/process/util;1"]
       .createInstance(Components.interfaces.nsIProcess);
-    proc.init(file);
-    proc.runAsync(["--voice", voice, "--text", text], 4);
+    proc.init(bashFile);
+
+    // 从文件读取文本
+    const cmd = `${edgePlaybackPath} --voice '${voice}' --text "$(cat '${textFile.path}')" > ${stdoutFile.path} 2> ${stderrFile.path}`;
+
+    debugLog(`EdgeTTS: Running command: ${cmd}`);
+
+    proc.runAsync(["-c", cmd], 2, {
+      observe: function() {
+        // 命令完成后读取输出并清理临时文件
+        setTimeout(() => {
+          try {
+            if (stdoutFile.exists()) {
+              const stdout = Zotero.File.getContents(stdoutFile);
+              if (stdout.trim()) {
+                debugLog(`EdgeTTS: STDOUT: ${stdout}`);
+              }
+              stdoutFile.remove(false);
+            }
+
+            if (stderrFile.exists()) {
+              const stderr = Zotero.File.getContents(stderrFile);
+              if (stderr.trim()) {
+                debugLog(`EdgeTTS: STDERR: ${stderr}`);
+              }
+              stderrFile.remove(false);
+            }
+
+            if (textFile.exists()) {
+              textFile.remove(false);
+            }
+          } catch (e) {
+            debugLog(`EdgeTTS: Error reading output files: ${e}`);
+          }
+        }, 100);
+      }
+    });
+
+    debugLog(`EdgeTTS: Command launched`);
   } catch (e) {
-    Zotero.debug(`EdgeTTS: speak error: ${e}`);
+    debugLog(`EdgeTTS: speak error: ${e}`);
+    debugLog(`EdgeTTS: Error stack: ${e.stack || 'No stack trace'}`);
   }
+
+  debugLog("=== EdgeTTS Debug End ===");
 }
 
 // 设置面板加载时调用
@@ -435,18 +571,32 @@ async function onPrefsLoad(doc: Document) {
 
 // 测试语音
 function onTestSpeak() {
+  debugLog("=== EdgeTTS: onTestSpeak Start ===");
+
   const voice = getVoice();
+  debugLog(`EdgeTTS: Test voice = ${voice}`);
+
   let testText: string;
   if (voice.startsWith("zh-")) {
     testText = "你好，这是语音测试";
+    debugLog(`EdgeTTS: Using Chinese test text`);
   } else if (voice.startsWith("ja-")) {
     testText = "こんにちは、これは音声テストです";
+    debugLog(`EdgeTTS: Using Japanese test text`);
   } else if (voice.startsWith("ko-")) {
     testText = "안녕하세요, 음성 테스트입니다";
+    debugLog(`EdgeTTS: Using Korean test text`);
   } else {
     testText = "Hello, this is a voice test";
+    debugLog(`EdgeTTS: Using English test text`);
   }
+
+  debugLog(`EdgeTTS: Test text = "${testText}"`);
+  debugLog(`EdgeTTS: Test text char codes: ${Array.from(testText.substring(0, 10)).map(c => c.charCodeAt(0)).join(', ')}`);
+
   speak(testText);
+
+  debugLog("=== EdgeTTS: onTestSpeak End ===");
 }
 
 async function onMainWindowUnload(_win: Window): Promise<void> {

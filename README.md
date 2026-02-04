@@ -4,19 +4,20 @@ A Zotero plugin that reads selected text aloud using Microsoft Edge TTS.
 
 ## Features
 
-- Auto-play: Automatically reads text when selected in PDF reader
-- Multiple voices: Supports Chinese, English, Japanese, Korean and more
-- One-click toggle: Enable/disable auto-play from the reader toolbar
+- **Auto-play**: Automatically reads text when selected in PDF reader
+- **Multiple voices**: Supports Chinese, English, Japanese, Korean and more
+- **One-click toggle**: Enable/disable auto-play from the reader toolbar
+- **Debug mode**: Optional detailed logging for troubleshooting
 
 ## Requirements
 
-- Zotero 7+
-- Linux (currently)
-- Node.js 20+
-- [edge-tts](https://github.com/rany2/edge-tts)
-- [mpv](https://mpv.io/) player
+- **Zotero 7+ / 8+** (Tested on Zotero 8.0.2)
+- **Linux** (currently)
+- **Node.js >20** (Required for building)
+- **[edge-tts](https://github.com/rany2/edge-tts)** - Text-to-speech engine
+- **[mpv](https://mpv.io/)** - Audio player
 
-> Tested on Ubuntu 22.04 with Zotero 7.0.27 (64-bit)
+> ✅ **Tested on Ubuntu 22.04 with Zotero 8.0.2 (64-bit)**
 
 ### Install Dependencies
 
@@ -44,17 +45,60 @@ pip install edge-tts
 ## Configuration
 
 Go to `Edit` → `Settings` → `EdgeTTS` to:
-- Select voice
-- Test voice playback
+- **Select voice**: Choose from available TTS voices
+- **Test voice**: Play a test sample
+- **Enable Debug Mode**: Turn on detailed logging for troubleshooting (disabled by default)
 
-## Build
+## Troubleshooting
+
+### Chinese Text Not Playing?
+
+1. Enable Debug Mode in settings (`Edit` → `Settings` → `EdgeTTS`)
+2. View debug logs: `Help` → `Debug Output Logging` → `View Output`
+3. Look for error messages starting with `EdgeTTS:`
+
+The plugin automatically:
+- Cleans invalid Unicode characters
+- Handles text encoding properly
+- Captures error output from edge-tts
+
+## Build from Source
+
+**Important**: Node.js version **>20** is required for building this plugin.
+
+### Step 1: Install Node.js >20
 
 ```bash
+# Install nvm (Node Version Manager)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
+
+# Reload shell configuration
+source ~/.bashrc  # or source ~/.zshrc for zsh
+
+# Install Node.js 22 (or any version >20)
+nvm install 22
+nvm use 22
+
+# Verify installation (must be >20)
+node -v  # Should show v22.x.x or higher
+npm -v
+```
+
+### Step 2: Build the Plugin
+
+```bash
+# Clone the repository (if you haven't already)
+git clone https://github.com/ccwss-maker/zotero-edge-tts.git
+cd zotero-edge-tts
+
+# Install dependencies
 npm install
+
+# Build the plugin
 npm run build
 ```
 
-After building, `zotero-edge-tts.xpi` will be generated in the `build/` folder. You can then import it into Zotero.
+After building, `zotero-edge-tts.xpi` will be generated in the `build/` folder. You can then install it in Zotero.
 
 ## License
 
